@@ -33,32 +33,39 @@ names(tmin) <- glue('tmin_{1:12}')
 
 # To calculate the bioclim ------------------------------------------------
 bioc <- dismo::biovars(prec = stack(prec), tmin = stack(tmin), tmax = stack(tmax))
-colnames(bioc) <- glue('bioc_{1:19}')
+names(bioc) <- glue('bioc_{1:19}')
 
 # To calculate the zonal --------------------------------------------------
 bioc_znal <- exact_extract(bioc, bsns, 'mean') %>% as_tibble()
 colnames(bioc_znal) <- gsub('mean.', '', colnames(bioc_znal))
 
+# Join the two tables -----------------------------------------------------
+tble <- bsns %>% st_drop_geometry %>% dplyr::select(NOMAH, NOMZH, NOMSZH) %>% as_tibble() %>% cbind(., bioc_znal) %>% as_tibble()
 
 # Cluster using Random Forest ---------------------------------------------
+mtrx <- tble[,4:ncol(tble)]
+nfrs <- 50
+ntrs <- 500
+rfds <- RFdist(mtrx, mtry1 = 9, ntrs, nfrs, addcl1 = T, addcl2 = F, imp = T, oob.prox1 = T)
+lbrf <- pamNew(rfds$cl1, 3)
 
-rf.clust <- function(occ, nforest, ntrees, nVars, nclasses){
-  
-  datRF_presences <- occ[,3:ncol(occ)]
-  print(nrow(datRF))
-  
-  attach(datRF_presences)
-  no.forests <- nforest
-  no.trees <- ntrees
-  distRF_presences <- RFdist(datRF_presences, mtry1 = nVars, no.trees, no.forests, addcl1 = T, addcl2 = F, imp = T, oob.prox1 = T)
-  no.presencesclasses <- nclasses
-  labelRF <- pamNew(distRF_presences$cl1, no.presencesclasses)
-  print(table(labelRF))
-  clusterdata <- hclust(as.dist(distRF_presences$cl1), method = 'ward.D2')
-  
-  return(list(labelRF, clusterdata))
-  
-}
+bsns <- mutate(bsns, cluster = lbrf)
+plot(dplyr::select(bsns, cluster))
+
+tble <- mutate(tble, cluster = lbrf)
+tble <- mutate(tble, cluster = factor(cluster, levels = as.character(1:5)))
+
+# To make a boxplot -------------------------------------------------------
+mtrx <- dplyr::select(tble, cluster, bioc_1:bioc_19)
+mtrx <- gather(mtrx, variable, value, -cluster)
+mtrx <- filter(mtrx, variable %in% c('bioc_1', 'bioc_10', 'bioc_11', 'bioc_12', 'bioc_16', 'bioc_17', 'bioc_18', 'bioc_19'))
+
+ggplot(data = mtrx, aes(x = cluster, y = value)) + 
+  geom_boxplot() + 
+  facet_wrap(~variable, scales = 'free') + 
+  labs(x = 'Clúster', y = 'Valor variable (C) - (mm)') +
+  theme_minimal() + 
+  theme()
 
 
 
