@@ -2,7 +2,7 @@
 
 # Load libraries ----------------------------------------------------------
 require(pacman)
-p_load(sf, tidyverse, rgeos, gtools, cclust, fs, Hmisc, dismo, multcomp, glue, exactextractr, geodata, ggspatial, randomForest)
+p_load(sf, tidyverse, rgeos, gtools, cclust, fs, extrafont, Hmisc, showtext, dismo, multcomp, glue, exactextractr, geodata, ggspatial, randomForest)
 
 g <- gc(reset = T)
 rm(list = ls())
@@ -47,7 +47,7 @@ mtrx <- tble[,4:ncol(tble)]
 nfrs <- 50
 ntrs <- 500
 rfds <- RFdist(mtrx, mtry1 = 9, ntrs, nfrs, addcl1 = T, addcl2 = F, imp = T, oob.prox1 = T)
-lbrf <- pamNew(rfds$cl1, 3)
+lbrf <- pamNew(rfds$cl1, 5)
 
 bsns <- mutate(bsns, cluster = lbrf)
 plot(dplyr::select(bsns, cluster))
@@ -60,12 +60,26 @@ mtrx <- dplyr::select(tble, cluster, bioc_1:bioc_19)
 mtrx <- gather(mtrx, variable, value, -cluster)
 mtrx <- filter(mtrx, variable %in% c('bioc_1', 'bioc_10', 'bioc_11', 'bioc_12', 'bioc_16', 'bioc_17', 'bioc_18', 'bioc_19'))
 
-ggplot(data = mtrx, aes(x = cluster, y = value)) + 
+lbls <- tibble(variable = c('bioc_1', 'bioc_10',  'bioc_11', 'bioc_12', 'bioc_16', 'bioc_17', 'bioc_18', 'bioc_19'), 
+               nombre = c('Temp prom.', 'Temp. mes más cálido', 'Temp. mes más frío', 'Prec acum', 'Prec trim más húmedo', 'Prec trim más seco', 'Prec trim más cálido', 'Prec trim más frío'))
+
+mtrx <- inner_join(mtrx, lbls, by = 'variable')
+mtrx <- mutate(mtrx, nombre = factor(nombre, levels = c('Temp prom.', 'Temp. mes más cálido', 'Temp. mes más frío', 'Prec acum', 'Prec trim más húmedo', 'Prec trim más seco', 'Prec trim más cálido', 'Prec trim más frío')))
+
+
+windowsFonts(Abadi = windowsFont('Abadi'))
+font_add_google("Montserrat", "Montserrat")
+
+gbox <- ggplot(data = mtrx, aes(x = cluster, y = value)) + 
   geom_boxplot() + 
-  facet_wrap(~variable, scales = 'free') + 
+  facet_wrap(~nombre, scales = 'free') + 
   labs(x = 'Clúster', y = 'Valor variable (C) - (mm)') +
   theme_minimal() + 
-  theme()
+  theme(text = element_text(family = 'Montserrat'),
+        strip.text.x = element_text(face = 'bold'), 
+        axis.text.y = element_text(angle = 90, hjust = 0.5))
+gbox
 
+ggsave(plot = gbox, filename = 'png/graphs/boxplot.png', units = 'in', width = 9, height = 7, dpi = 300)
 
 
