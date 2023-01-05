@@ -2,7 +2,7 @@
 
 # Load libraries ----------------------------------------------------------
 require(pacman)
-p_load(sf, tidyverse, rgeos, gtools, cclust, fs, extrafont, Hmisc, showtext, colourpicker, dismo, multcomp, glue, exactextractr, geodata, ggspatial, randomForest)
+p_load(sf, tidyverse, rgeos, gtools, rnaturalearthdata, rnaturalearth, cclust, fs, extrafont, Hmisc, showtext, colourpicker, dismo, multcomp, glue, exactextractr, geodata, ggspatial, randomForest)
 
 g <- gc(reset = T)
 rm(list = ls())
@@ -101,7 +101,7 @@ mtrx <- inner_join(mtrx, clss, by = 'cluster')
 
 colourWidget()
 
-clrs <- c('#53805E', '#B57A36', '#37B896', '#805A21', '#823D22')
+clrs <- c('#53805E', '#B57A36', '#37B896', '#515D8C', '#1F6ABF')
 mtrx <- mutate(mtrx, class = factor(class, levels = clss$class))
 
 gbox <- ggplot(data = mtrx, aes(x = cluster, y = value, fill = class)) + 
@@ -133,5 +133,41 @@ gbox <- ggplot(data = mtrx, aes(x = cluster, y = value, fill = class)) +
 
 gbox
 ggplot2::ggsave(plot = gbox, filename = 'png/graphs/boxplot.png', device = 'png', units = 'in', width = 9, height = 7, dpi = 300)
+
+# To make the map ---------------------------------------------------------
+bsns <- mutate(bsns, cluster = factor(cluster, levels = as.character(1:5)))
+bsns <- inner_join(bsns, clss, by = 'cluster')
+bsns <- mutate(bsns, class = factor(class, levels = clss$class))
+st_write(bsns, 'gpkg/basins_col_cluster.gpkg')
+
+wrld <- ne_countries(returnclass = 'sf', scale = 50)
+
+gmap <- ggplot() + 
+  geom_sf(data = bsns, aes(fill = class), col = 'grey70', lwd = 0.00001) + 
+  scale_fill_manual(values = clrs) + 
+  geom_sf(data = wrld, fill = NA, col = 'grey70', lwd = 0.2) +
+  labs(x = 'Lon', y = 'Lat', fill = 'Clúster', caption = 'Adaptado de IDEAM / Worldclim y uso de Random Forest\nElaborado por Fabio Castro-Llanos') +
+  coord_sf(xlim = ext(bsns)[1:2], ylim = ext(bsns)[3:4]) + 
+  ggtitle(label = 'Clústerización con Random Forest\npara las cuencas hidrográficas según el clima') +
+  theme_minimal() + 
+  theme(plot.title = element_text(face = 'bold', hjust = 0.5, color = 'grey50'),
+        plot.subtitle = element_text(color = 'grey50', hjust = 0.5, vjust = 0),
+        axis.title = element_text(face = 'bold'),
+        legend.position = c(0.18, 0.135),
+        legend.background = element_rect(fill = 'white', color = NA),
+        legend.key = element_blank(),
+        text = element_text(family = 'georg', color = 'grey50'),
+        axis.text.y = element_text(hjust = 0.5, angle = 90, size = 6),
+        plot.caption = element_text(hjust = 0.5),
+        axis.text.x = element_text(size = 6)) +
+  # opts(legend.background = theme_rect(col = 0)) +
+  annotation_scale(location =  "br", width_hint = 0.5, text_family = 'georg', text_col = 'grey60', bar_cols = c('grey60', 'grey99'), line_width = 0.2) +
+  annotation_north_arrow(location = "tl", which_north = "true", 
+                         pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"), 
+                         style = north_arrow_fancy_orienteering(text_family = 'georg', text_col = 'grey40', line_col = 'grey60', fill = c('grey60', 'grey99'))) 
+
+gmap
+ggsave(plot = gmap, filename = 'png/maps/basins_cluster.png', units = 'in', width = 7, height = 9, dpi = 300)
+
 
 
